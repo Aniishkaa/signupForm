@@ -1,73 +1,148 @@
-# Welcome to your Lovable project
+# Qwik Influencer Signup Form
 
-## Project info
+This is a Qwik application that provides an influencer signup form for Printerpix. It has been converted from a React application to use the Qwik framework with Qwik City for routing.
 
-**URL**: https://lovable.dev/projects/3ffe3be6-3e6b-4947-9099-58a36c089151
+## Features
 
-## How can I edit this code?
+- **Modern Qwik Framework**: Built with Qwik for optimal performance and developer experience
+- **Responsive Design**: Mobile-first design with Tailwind CSS 4
+- **Form Validation**: Client-side validation using Zod schema validation
+- **Toast Notifications**: Success and error feedback for form submissions
+- **Regional Site Links**: Quick access to country-specific Printerpix websites
+- **Instagram Integration**: Form specifically designed for Instagram influencers
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **Framework**: [Qwik](https://qwik.dev/) with [Qwik City](https://qwik.builder.io/qwikcity/overview/)
+- **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
+- **Validation**: [Zod](https://zod.dev/)
+- **Build Tool**: [Vite](https://vitejs.dev/)
+- **Language**: TypeScript
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/3ffe3be6-3e6b-4947-9099-58a36c089151) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js 18+ 
+- npm, yarn, or bun
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+1. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+# or
+bun install
 ```
 
-**Edit a file directly in GitHub**
+2. Start the development server:
+```bash
+npm run dev
+# or
+yarn dev
+# or
+bun dev
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+3. Open your browser and navigate to `http://localhost:5173`
 
-**Use GitHub Codespaces**
+### Building for Production
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+npm run build
+# or
+yarn build
+# or
+bun run build
+```
 
-## What technologies are used for this project?
+### Preview Production Build
 
-This project is built with:
+```bash
+npm run preview
+# or
+yarn preview
+# or
+bun run preview
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Project Structure
 
-## How can I deploy this project?
+```
+src/
+├── components/          # Reusable components
+│   ├── InfluencerSignupForm.tsx  # Main form component
+│   └── router-head/    # Router head component
+├── routes/             # Qwik City routes
+│   ├── index.tsx       # Home page
+│   ├── layout.tsx      # Root layout
+│   └── influencer-signup/  # Signup form route
+├── assets/             # Static assets (flags, images)
+├── entry.client.tsx    # Client entry point
+├── entry.server.tsx    # Server entry point
+├── global.css          # Global styles and Tailwind imports
+└── root.tsx            # Root component
+```
 
-Simply open [Lovable](https://lovable.dev/projects/3ffe3be6-3e6b-4947-9099-58a36c089151) and click on Share -> Publish.
+## Form Fields
 
-## Can I connect a custom domain to my Lovable project?
+The influencer signup form includes the following fields:
 
-Yes, you can!
+- **Instagram Username**: Required, must be valid Instagram handle
+- **Follower Count**: Range selection (10K-500K+)
+- **Traffic Range**: Monthly profile traffic selection
+- **Email Address**: Required, must be valid email format
+- **Country of Residence**: Dropdown with supported countries
+- **Followers Location**: Where most followers are based
+- **Product Selection**: Choose from available products to promote
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## API Integration
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+The form submits to a Supabase Edge Function:
+```
+POST https://rrbbkiaguqmcgwvibiqv.supabase.co/functions/v1/submit-influencer-form
+```
+
+## Styling
+
+The application uses Tailwind CSS 4 with custom CSS variables for theming. Custom gradients and shadows are defined for the Instagram-inspired design.
+
+## Development
+
+### Key Qwik Concepts Used
+
+- **`component$`**: For creating Qwik components
+- **`useSignal`**: For reactive state management
+- **`$`**: For creating event handlers
+- **`useTask$`**: For side effects and async operations
+
+### Adding New Routes
+
+To add new routes, create files in the `src/routes/` directory following the Qwik City file-based routing convention.
+
+### Styling Components
+
+Use Tailwind CSS classes and custom CSS variables defined in `src/global.css`. The design system includes Instagram-inspired colors and gradients.
+
+## Deployment
+
+The application can be deployed to any platform that supports Node.js applications. Popular options include:
+
+- Vercel
+- Netlify
+- Railway
+- DigitalOcean App Platform
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+This project is proprietary to Printerpix. Please contact the development team for licensing information.
