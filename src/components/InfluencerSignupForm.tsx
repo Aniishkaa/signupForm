@@ -1,26 +1,5 @@
-import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { Loader2, Instagram, Users, Mail, Package, Globe } from "lucide-react";
-
-// Flag imports
-import usFlag from "@/assets/flags/us.png";
-import gbFlag from "@/assets/flags/gb.png";
-import frFlag from "@/assets/flags/fr-full-circle.png";
-import itFlag from "@/assets/flags/it-circular.png";
-import esFlag from "@/assets/flags/es.png";
-import deFlag from "@/assets/flags/de.png";
-import nlFlag from "@/assets/flags/nl.png";
-import inFlag from "@/assets/flags/in.png";
+import { component$, useSignal, $ } from '@builder.io/qwik';
+import { z } from 'zod';
 
 const countries = [
   "United Kingdom",
@@ -78,44 +57,58 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-export const InfluencerSignupForm = () => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<string>("");
-  const { toast } = useToast();
+export const InfluencerSignupForm = component$(() => {
+  const isSubmitting = useSignal(false);
+  const selectedProduct = useSignal<string>("");
+  const formData = useSignal<Partial<FormData>>({
+    productsToPromote: "",
+  });
+  const errors = useSignal<Partial<Record<keyof FormData, string>>>({});
+  const showSuccessToast = useSignal(false);
+  const showErrorToast = useSignal(false);
+  const toastMessage = useSignal("");
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-    reset,
-  } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      productsToPromote: "",
-    },
+  const handleProductSelect = $((product: string) => {
+    selectedProduct.value = product;
+    formData.value.productsToPromote = product;
   });
 
-  const watchedValues = watch();
+  const validateForm = $(() => {
+    try {
+      formSchema.parse(formData.value);
+      errors.value = {};
+      return true;
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const newErrors: Partial<Record<keyof FormData, string>> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            newErrors[err.path[0] as keyof FormData] = err.message;
+          }
+        });
+        errors.value = newErrors;
+      }
+      return false;
+    }
+  });
 
-  const handleProductSelect = (product: string) => {
-    setSelectedProduct(product);
-    setValue("productsToPromote", product);
-  };
+  const onSubmit = $(async () => {
+    console.log("Form submission started", formData.value);
+    
+    if (!validateForm()) {
+      return;
+    }
 
-  const onSubmit = async (data: FormData) => {
-    console.log("Form submission started", data);
-    setIsSubmitting(true);
+    isSubmitting.value = true;
     
     try {
       // Format username to ensure it starts with @
-      const formattedUsername = data.instagramUsername.startsWith('@') 
-        ? data.instagramUsername 
-        : `@${data.instagramUsername}`;
+      const formattedUsername = formData.value.instagramUsername?.startsWith('@') 
+        ? formData.value.instagramUsername 
+        : `@${formData.value.instagramUsername}`;
 
       const submissionData = {
-        ...data,
+        ...formData.value,
         instagramUsername: formattedUsername,
         timestamp: new Date().toISOString(),
       };
@@ -144,45 +137,64 @@ export const InfluencerSignupForm = () => {
         throw new Error(result.error || "Failed to submit form");
       }
       
-      toast({
-        title: "Application Submitted! 🎉",
-        description: "Thanks for your interest! We'll review your application and get back to you soon.",
-      });
+      // Show success toast
+      toastMessage.value = "Application Submitted! 🎉 Thanks for your interest! We'll review your application and get back to you soon.";
+      showSuccessToast.value = true;
 
-      reset();
-      setSelectedProduct("");
+      // Reset form
+      formData.value = { productsToPromote: "" };
+      selectedProduct.value = "";
+      
+      // Hide toast after 5 seconds
+      setTimeout(() => {
+        showSuccessToast.value = false;
+      }, 5000);
       
     } catch (error) {
       console.error("Submission error:", error);
-      toast({
-        title: "Oops, something went wrong!",
-        description: "Please try submitting again. If the problem persists, contact us directly.",
-        variant: "destructive",
-      });
+      
+      // Show error toast
+      toastMessage.value = "Oops, something went wrong! Please try submitting again. If the problem persists, contact us directly.";
+      showErrorToast.value = true;
+
+      // Hide toast after 5 seconds
+      setTimeout(() => {
+        showErrorToast.value = false;
+      }, 5000);
     } finally {
-      setIsSubmitting(false);
+      isSubmitting.value = false;
     }
-  };
+  });
+
+  const updateField = $((field: keyof FormData, value: string) => {
+    formData.value[field] = value;
+    // Clear error when user starts typing
+    if (errors.value[field]) {
+      delete errors.value[field];
+    }
+  });
 
   return (
-    <div className="min-h-screen bg-gradient-subtle p-4">
-      <div className="max-w-md mx-auto pt-8 pb-12">
+    <div class="min-h-screen bg-gradient-subtle p-4">
+      <div class="max-w-md mx-auto pt-8 pb-12">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-instagram rounded-full flex items-center justify-center mx-auto mb-4 shadow-hover-lift">
-            <Instagram className="w-8 h-8 text-white" />
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 bg-gradient-instagram rounded-full flex items-center justify-center mx-auto mb-4 shadow-hover-lift">
+            <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+            </svg>
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">
+          <h1 class="text-2xl font-bold text-foreground mb-2">
             Hey influencer! 👋
           </h1>
-          <p className="text-muted-foreground text-base">
+          <p class="text-muted-foreground text-base">
             We'd love to learn more about you 👇
           </p>
         </div>
 
         {/* Introductory Paragraph */}
-        <div className="text-center mb-6 p-4 bg-card rounded-lg border shadow-soft">
-          <p className="text-foreground leading-relaxed">
+        <div class="text-center mb-6 p-4 bg-card rounded-lg border shadow-soft">
+          <p class="text-foreground leading-relaxed">
             Thank you for your interest in collaborating with Printerpix!<br />
             We love working with creative influencers and are excited to explore a barter collaboration with you.<br />
             You can switch to your local region or preferred language using the section below this form.
@@ -190,309 +202,316 @@ export const InfluencerSignupForm = () => {
         </div>
 
         {/* Form */}
-        <Card className="bg-gradient-card border-0 shadow-soft">
-          <CardHeader className="pb-4">
-            <div className="text-center">
-              <h2 className="text-lg font-semibold">Let's Collaborate!</h2>
+        <div class="bg-gradient-card border-0 shadow-soft rounded-lg">
+          <div class="p-6 pb-4">
+            <div class="text-center">
+              <h2 class="text-lg font-semibold">Let's Collaborate!</h2>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+          </div>
+          <div class="px-6 pb-6 space-y-6">
+            <div class="space-y-6">
               {/* Instagram Username */}
-              <div className="space-y-2">
-                <Label htmlFor="instagramUsername" className="flex items-center gap-2 font-medium">
-                  <Instagram className="w-4 h-4 text-instagram-purple" />
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 font-medium">
+                  <svg class="w-4 h-4 text-instagram-purple" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                  </svg>
                   Instagram Username
-                </Label>
-                <Input
-                  id="instagramUsername"
+                </label>
+                <input
+                  type="text"
                   placeholder="@yourhandle"
-                  {...register("instagramUsername")}
-                  className="h-12 text-base"
+                  value={formData.value.instagramUsername || ""}
+                  onInput$={(ev) => updateField("instagramUsername", (ev.target as HTMLInputElement).value)}
+                  class="h-12 text-base w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
-                {errors.instagramUsername && (
-                  <p className="text-sm text-destructive">{errors.instagramUsername.message}</p>
+                {errors.value.instagramUsername && (
+                  <p class="text-sm text-destructive">{errors.value.instagramUsername}</p>
                 )}
               </div>
 
               {/* Follower Count */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2 font-medium">
-                  <Users className="w-4 h-4 text-instagram-pink" />
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 font-medium">
+                  <svg class="w-4 h-4 text-instagram-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
+                  </svg>
                   Follower Count
-                </Label>
-                <Select onValueChange={(value) => setValue("followerCount", value)}>
-                  <SelectTrigger className="h-12 text-base">
-                    <SelectValue placeholder="Select your follower count range" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {followerRanges.map((range) => (
-                      <SelectItem key={range} value={range}>
-                        {range}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.followerCount && (
-                  <p className="text-sm text-destructive">{errors.followerCount.message}</p>
+                </label>
+                <select
+                  value={formData.value.followerCount || ""}
+                  onChange$={(ev) => updateField("followerCount", (ev.target as HTMLSelectElement).value)}
+                  class="h-12 text-base w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select your follower count range</option>
+                  {followerRanges.map((range) => (
+                    <option key={range} value={range}>
+                      {range}
+                    </option>
+                  ))}
+                </select>
+                {errors.value.followerCount && (
+                  <p class="text-sm text-destructive">{errors.value.followerCount}</p>
                 )}
               </div>
 
               {/* Traffic Range */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2 font-medium">
-                  <Users className="w-4 h-4 text-instagram-orange" />
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 font-medium">
+                  <svg class="w-4 h-4 text-instagram-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
+                  </svg>
                   Traffic on Profile
-                </Label>
-                <Select onValueChange={(value) => setValue("trafficRange", value)}>
-                  <SelectTrigger className="h-12 text-base">
-                    <SelectValue placeholder="Select your traffic range" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {trafficRanges.map((range) => (
-                      <SelectItem key={range} value={range}>
-                        {range}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.trafficRange && (
-                  <p className="text-sm text-destructive">{errors.trafficRange.message}</p>
+                </label>
+                <select
+                  value={formData.value.trafficRange || ""}
+                  onChange$={(ev) => updateField("trafficRange", (ev.target as HTMLSelectElement).value)}
+                  class="h-12 text-base w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select your traffic range</option>
+                  {trafficRanges.map((range) => (
+                    <option key={range} value={range}>
+                      {range}
+                    </option>
+                  ))}
+                </select>
+                {errors.value.trafficRange && (
+                  <p class="text-sm text-destructive">{errors.value.trafficRange}</p>
                 )}
               </div>
 
               {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email" className="flex items-center gap-2 font-medium">
-                  <Mail className="w-4 h-4 text-instagram-purple" />
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 font-medium">
+                  <svg class="w-4 h-4 text-instagram-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
                   Email Address
-                </Label>
-                <Input
-                  id="email"
+                </label>
+                <input
                   type="email"
                   placeholder="your@email.com"
-                  {...register("email")}
-                  className="h-12 text-base"
+                  value={formData.value.email || ""}
+                  onInput$={(ev) => updateField("email", (ev.target as HTMLInputElement).value)}
+                  class="h-12 text-base w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
-                {errors.email && (
-                  <p className="text-sm text-destructive">{errors.email.message}</p>
+                {errors.value.email && (
+                  <p class="text-sm text-destructive">{errors.value.email}</p>
                 )}
               </div>
 
               {/* Country of Residence */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2 font-medium">
-                  <Globe className="w-4 h-4 text-instagram-pink" />
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 font-medium">
+                  <svg class="w-4 h-4 text-instagram-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
                   Country of Residence
-                </Label>
-                <Select onValueChange={(value) => setValue("countryOfResidence", value)}>
-                  <SelectTrigger className="h-12 text-base">
-                    <SelectValue placeholder="Select your country" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countries.map((country) => (
-                      <SelectItem key={country} value={country}>
-                        {country}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.countryOfResidence && (
-                  <p className="text-sm text-destructive">{errors.countryOfResidence.message}</p>
+                </label>
+                <select
+                  value={formData.value.countryOfResidence || ""}
+                  onChange$={(ev) => updateField("countryOfResidence", (ev.target as HTMLSelectElement).value)}
+                  class="h-12 text-base w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select your country</option>
+                  {countries.map((country) => (
+                    <option key={country} value={country}>
+                      {country}
+                    </option>
+                  ))}
+                </select>
+                {errors.value.countryOfResidence && (
+                  <p class="text-sm text-destructive">{errors.value.countryOfResidence}</p>
                 )}
               </div>
 
               {/* Followers Location */}
-              <div className="space-y-2">
-                 <Label className="flex items-center gap-2 font-medium">
-                   <Globe className="w-4 h-4 text-instagram-orange" />
-                   Where &gt;50% of Your Followers Are Based
-                 </Label>
-                 <Select onValueChange={(value) => setValue("followersLocation", value)}>
-                   <SelectTrigger className="h-12 text-base">
-                     <SelectValue placeholder="Select Main Location" />
-                   </SelectTrigger>
-                  <SelectContent>
-                    {countries.map((country) => (
-                      <SelectItem key={country} value={country}>
-                        {country}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.followersLocation && (
-                  <p className="text-sm text-destructive">{errors.followersLocation.message}</p>
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 font-medium">
+                  <svg class="w-4 h-4 text-instagram-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  Where are most of your followers based?
+                </label>
+                <select
+                  value={formData.value.followersLocation || ""}
+                  onChange$={(ev) => updateField("followersLocation", (ev.target as HTMLSelectElement).value)}
+                  class="h-12 text-base w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select followers location</option>
+                  {countries.map((country) => (
+                    <option key={country} value={country}>
+                      {country}
+                    </option>
+                  ))}
+                </select>
+                {errors.value.followersLocation && (
+                  <p class="text-sm text-destructive">{errors.value.followersLocation}</p>
                 )}
               </div>
 
-               {/* Products to Promote */}
-               <div className="space-y-3">
-                 <Label className="flex items-center gap-2 font-medium">
-                   <Package className="w-4 h-4 text-instagram-purple" />
-                   Pick a Free Product to Promote
-                 </Label>
-                 <RadioGroup value={selectedProduct} onValueChange={handleProductSelect}>
-                   <div className="grid grid-cols-2 gap-3">
-                     {products.map((product) => (
-                         <div
-                           key={product}
-                           className={`p-3 rounded-lg border transition-all ${
-                             selectedProduct === product
-                               ? "border-instagram-purple bg-gradient-subtle"
-                               : "border-border hover:border-instagram-purple/50"
-                           }`}
-                         >
-                           <div className="flex items-center space-x-2">
-                             <RadioGroupItem value={product} id={product} />
-                             <Label 
-                               htmlFor={product}
-                               className="text-sm font-medium cursor-pointer flex-1"
-                             >
-                               {product}
-                             </Label>
-                           </div>
-                         </div>
-                     ))}
-                   </div>
-                 </RadioGroup>
-                 {errors.productsToPromote && (
-                   <p className="text-sm text-destructive">{errors.productsToPromote.message}</p>
-                 )}
-               </div>
-
-               {/* Contact Notice */}
-               <div className="space-y-3">
-                 <p className="text-sm leading-5 text-muted-foreground">
-                   We will be contacting you by email<br />
-                   Please ensure your details are accurate. All information will be verified before onboarding, and incorrect entries may result in removal from the program.
-                 </p>
-               </div>
+              {/* Products to Promote */}
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 font-medium">
+                  <svg class="w-4 h-4 text-instagram-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                  </svg>
+                  Which product would you like to promote?
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                  {products.map((product) => (
+                    <button
+                      key={product}
+                      type="button"
+                      onClick$={() => handleProductSelect(product)}
+                      class={`p-3 text-sm font-medium rounded-lg border transition-all ${
+                        selectedProduct.value === product
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      {product}
+                    </button>
+                  ))}
+                </div>
+                {errors.value.productsToPromote && (
+                  <p class="text-sm text-destructive">{errors.value.productsToPromote}</p>
+                )}
+              </div>
 
               {/* Submit Button */}
-              <Button
-                type="submit"
-                variant="instagram"
-                size="lg"
-                className="w-full"
-                disabled={isSubmitting}
+              <button
+                type="button"
+                onClick$={onSubmit}
+                disabled={isSubmitting.value}
+                class="w-full h-12 bg-gradient-instagram text-white font-medium rounded-lg shadow-soft hover:shadow-hover-lift transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                {isSubmitting.value ? (
+                  <div class="flex items-center justify-center gap-2">
+                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
                     Submitting...
-                  </>
+                  </div>
                 ) : (
-                  <>
-                    Let's Collab 🚀
-                  </>
+                  "Submit Application"
                 )}
-              </Button>
-
-              {/* Privacy Note */}
-              <p className="text-sm text-muted-foreground text-center mt-4">
-                Your info stays private and secure – we don't spam.
-              </p>
-            </form>
-          </CardContent>
-        </Card>
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Regional Sites Section */}
-        <div className="mt-8 p-6 bg-card rounded-lg border shadow-soft">
-          <h3 className="text-sm font-medium text-center mb-3 text-muted-foreground">
+        <div class="mt-8 p-6 bg-card rounded-lg border shadow-soft">
+          <h3 class="text-sm font-medium text-center mb-3 text-muted-foreground">
             Country of residence? Click below to visit your regional site:
           </h3>
-          <div className="flex items-center justify-center gap-4 flex-nowrap">
+          <div class="flex items-center justify-center gap-4 flex-nowrap">
             <a
               href="https://www.printerpix.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
+              class="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
             >
-              <div className="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
-                <img src={usFlag} alt="United States" className="w-full h-full object-cover" />
+              <div class="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
+                <img src="https://www.printerpix.com/wp-content/uploads/2023/07/us-flag.png" alt="United States" class="w-full h-full object-cover" />
               </div>
-              <span className="text-xs font-medium text-foreground">US</span>
+              <span class="text-xs font-medium text-foreground">US</span>
             </a>
             <a
               href="https://www.printerpix.co.uk"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
+              class="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
             >
-              <div className="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
-                <img src={gbFlag} alt="United Kingdom" className="w-full h-full object-cover" />
+              <div class="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
+                <img src="https://www.printerpix.co.uk/wp-content/uploads/2023/07/gb-flag.png" alt="United Kingdom" class="w-full h-full object-cover" />
               </div>
-              <span className="text-xs font-medium text-foreground">UK</span>
+              <span class="text-xs font-medium text-foreground">UK</span>
             </a>
             <a
               href="https://www.printerpix.fr"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
+              class="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
             >
-              <div className="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
-                <img src={frFlag} alt="France" className="w-full h-full object-cover" />
+              <div class="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
+                <img src="https://www.printerpix.fr/wp-content/uploads/2023/07/fr-flag.png" alt="France" class="w-full h-full object-cover" />
               </div>
-              <span className="text-xs font-medium text-foreground">FR</span>
+              <span class="text-xs font-medium text-foreground">FR</span>
             </a>
             <a
               href="https://www.printerpix.it"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
+              class="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
             >
-              <div className="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
-                <img src={itFlag} alt="Italy" className="w-full h-full object-cover" />
+              <div class="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
+                <img src="https://www.printerpix.it/wp-content/uploads/2023/07/it-flag.png" alt="Italy" class="w-full h-full object-cover" />
               </div>
-              <span className="text-xs font-medium text-foreground">IT</span>
+              <span class="text-xs font-medium text-foreground">IT</span>
             </a>
             <a
               href="https://www.printerpix.es"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
+              class="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
             >
-              <div className="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
-                <img src={esFlag} alt="Spain" className="w-full h-full object-cover" />
+              <div class="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
+                <img src="https://www.printerpix.es/wp-content/uploads/2023/07/es-flag.png" alt="Spain" class="w-full h-full object-cover" />
               </div>
-              <span className="text-xs font-medium text-foreground">ES</span>
+              <span class="text-xs font-medium text-foreground">ES</span>
             </a>
             <a
               href="https://www.printerpix.de"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
+              class="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
             >
-              <div className="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
-                <img src={deFlag} alt="Germany" className="w-full h-full object-cover" />
+              <div class="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
+                <img src="https://www.printerpix.de/wp-content/uploads/2023/07/de-flag.png" alt="Germany" class="w-full h-full object-cover" />
               </div>
-              <span className="text-xs font-medium text-foreground">DE</span>
+              <span class="text-xs font-medium text-foreground">DE</span>
             </a>
             <a
               href="https://www.printerpix.nl"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
+              class="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
             >
-              <div className="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
-                <img src={nlFlag} alt="Netherlands" className="w-full h-full object-cover" />
+              <div class="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
+                <img src="https://www.printerpix.nl/wp-content/uploads/2023/07/nl-flag.png" alt="Netherlands" class="w-full h-full object-cover" />
               </div>
-              <span className="text-xs font-medium text-foreground">NL</span>
+              <span class="text-xs font-medium text-foreground">NL</span>
             </a>
             <a
               href="https://www.printerpix.in"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
+              class="flex flex-col items-center gap-1 hover:scale-105 transition-transform flex-shrink-0"
             >
-              <div className="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
-                <img src={inFlag} alt="India" className="w-full h-full object-cover" />
+              <div class="w-8 h-8 rounded-full overflow-hidden shadow-md border border-white">
+                <img src="https://www.printerpix.in/wp-content/uploads/2023/07/in-flag.png" alt="India" class="w-full h-full object-cover" />
               </div>
-              <span className="text-xs font-medium text-foreground">IN</span>
+              <span class="text-xs font-medium text-foreground">IN</span>
             </a>
           </div>
         </div>
+
+        {/* Toast Notifications */}
+        {showSuccessToast.value && (
+          <div class="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-sm">
+            <p>{toastMessage.value}</p>
+          </div>
+        )}
+
+        {showErrorToast.value && (
+          <div class="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-sm">
+            <p>{toastMessage.value}</p>
+          </div>
+        )}
       </div>
     </div>
   );
-};
+});
